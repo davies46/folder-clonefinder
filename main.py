@@ -18,8 +18,7 @@ no_access = []
 not_found = []
 not_folder = []
 
-
-units = {"B": 1, "KB": 10**3, "MB": 10**6, "GB": 10**9, "TB": 10**12, "K": 10**3, "M": 10**6, "G": 10**9, "T": 10**12}
+units = {"B": 1, "KB": 10 ** 3, "MB": 10 ** 6, "GB": 10 ** 9, "TB": 10 ** 12, "K": 10 ** 3, "M": 10 ** 6, "G": 10 ** 9, "T": 10 ** 12}
 
 
 class Args:
@@ -49,7 +48,7 @@ class Args:
         if not re.match(r' ', size):
             size = re.sub(r'([KMGT]?B)', r' \1', size)
         number, unit = [string.strip() for string in size.split()]
-        return int(float(number)*units[unit])
+        return int(float(number) * units[unit])
 
 
 args = Args()
@@ -84,12 +83,19 @@ def isChild(p1, p2):
 
 class Duplicate:
     def __init__(self, size, path1, path2):
-        self.__path1 = path1
-        self.__path2 = path2
         self.size = size
+        if path1 > path2:
+            self.__path1 = path1
+            self.__path2 = path2
+        else:
+            self.__path1 = path1
+            self.__path2 = path2
 
     def __str__(self):
         return '%d, <%s> and <%s>' % (self.size, self.__path1, self.__path2)
+
+    def getKey(self):
+        return self.__path1 + '+' + self.__path2
 
     def isChildOf(self, other_dupe):
         # Either path1 or path2 of either dupe might be a different device, so a different root, but they must have a root in common
@@ -135,7 +141,7 @@ def searchTree(path):
                     # If either path of a duplicate wholly contains either path of another duplicate, then it's a subtree
                     new_dupe = Duplicate(total_size, path, paths[digest])
                     orphan = True
-                    children = []
+                    children = {}
                     for dupe in duplicates:
                         if new_dupe.isChildOf(dupe):
                             # We have a parent, so our existence is pointless
@@ -146,11 +152,12 @@ def searchTree(path):
                             # We're the parent of an existing duplicate, so that child is now useless and should be removed
                             # assert orphan, 'We have a parent and a child. How did the child survive here without the parent already deleting it?'
                             # print('We have a child')
-                            children.append(dupe)
+                            if dupe.getKey() not in children:
+                                children[dupe.getKey()] = dupe
                     if orphan:
                         # print('Add dupe', new_dupe)
                         duplicates.append(new_dupe)
-                    for child in children:
+                    for child in children.values():
                         # print('Remove child', dupe)
                         duplicates.remove(child)
                 else:

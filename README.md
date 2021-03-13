@@ -6,6 +6,6 @@ Search different physical devices concurrently
 
 Example:
 
-main.py -m 1G -e '/media/backup'
+main.py -m 1G -e /media/backup
 
 Report duplicate folders. Ignore folders below 1GB. Ignore the physical drive at /media/backup

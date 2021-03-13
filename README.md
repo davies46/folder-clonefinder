@@ -3,3 +3,9 @@
 It will report back the largest folders it can find, but none of those folders' children.
 
 Search different physical devices concurrently
+
+Example:
+
+main.py -m 1G -e '/media/backup'
+
+Report duplicate folders. Ignore folders below 1GB. Ignore the physical drive at /media/backup

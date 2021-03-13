@@ -139,19 +139,19 @@ def searchTree(path):
                     for dupe in duplicates:
                         if new_dupe.isChildOf(dupe):
                             # We have a parent, so our existence is pointless
-                            assert not children, 'We have a child and a parent. How did the child survive here without the parent already deleting it?'
-                            print('We have a parent')
+                            # assert not children, 'We have a child and a parent. How did the child survive here without the parent already deleting it?'
+                            # print('We have a parent')
                             orphan = False
                         if dupe.isChildOf(new_dupe):
                             # We're the parent of an existing duplicate, so that child is now useless and should be removed
-                            assert orphan, 'We have a parent and a child. How did the child survive here without the parent already deleting it?'
-                            print('We have a child')
+                            # assert orphan, 'We have a parent and a child. How did the child survive here without the parent already deleting it?'
+                            # print('We have a child')
                             children.append(dupe)
                     if orphan:
-                        print('Add dupe', new_dupe)
+                        # print('Add dupe', new_dupe)
                         duplicates.append(new_dupe)
                     for child in children:
-                        print('Remove child', dupe)
+                        # print('Remove child', dupe)
                         duplicates.remove(child)
                 else:
                     drive_threads = []
@@ -180,7 +180,7 @@ if __name__ == "__main__":
     for index, thread in enumerate(threads):
         thread.join()
 
-    print(len(paths), 'candidate paths added')
+    # print(len(paths), 'candidate paths added')
 
     sorted_duplicates = sorted(duplicates, key=operator.attrgetter('size'), reverse=True)
     for duplicate in sorted_duplicates:

@@ -116,7 +116,11 @@ def searchTree(path):
     digest = 0
     subtree_visit_num += 1
     if subtree_visit_num % 100000 == 0:
-        print('Visiting subtree #%d. Fat folder paths added: %d. Duplicates found: %d' % (subtree_visit_num, len(paths), len(duplicates)))
+        if len(path) > 100:
+            vp = path[0:49] + '...' + path[-49:]
+        else:
+            vp = path
+        print('Visiting subtree #%d. Paths added: %d. Duplicates: %d. <%s>' % (subtree_visit_num, len(paths), len(duplicates), vp))
     try:
         # Examine every file and folder at this level
         with os.scandir(path) as dir_entries:

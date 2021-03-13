@@ -4,7 +4,7 @@ It will report back the largest folders it can find, but none of those folders' 
 
 Search different physical devices concurrently
 
-Example:
+For example:
 
 main.py -m 1G -e /media/backup
 

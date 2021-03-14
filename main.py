@@ -25,8 +25,9 @@ class Args:
     def __init__(self):
         parser = argparse.ArgumentParser('Find duplicate folders in filesystem')
         # parser.add_argument('infile', metavar='input file', nargs=1, help='File to process')
-        parser.add_argument('-e', '--exclude', default='/run/timeshift/backup', help='Comma separated list of root-level folders to exclude')
-        parser.add_argument('-m', '--minsize', default='1G', help='Smallest size to care about')
+        parser.add_argument('-e', '--exclude', default='/run/timeshift/backup,/', help='Comma separated list of root-level folders to exclude')
+        parser.add_argument('-m', '--minsize', default='10G', help='Smallest size to care about')
+        parser.add_argument('-x', '--exclude-subfolders', default='/media/pdavies/Hitachi/timeshift', help='Folders to exclude from search')
 
         # parser.add_argument('infile', nargs='?', type=argparse.FileType('r'), default=sys.stdin)
         # parser.add_argument('outfile', nargs='?', type=argparse.FileType('w'), default=sys.stdout)
@@ -37,6 +38,11 @@ class Args:
             self.exclude = parser_args.exclude.split(',')
         else:
             self.exclude = []
+        if parser_args.exclude_subfolders:
+            self.exclude_subfolders = parser_args.exclude_subfolders.split(',')
+        else:
+            self.exclude_subfolders = []
+
         self.minsize = Args.parse_size(parser_args.minsize)
 
     @staticmethod
@@ -55,6 +61,7 @@ args = Args()
 print('Min folder size', args.minsize)
 print('Exclude root folders', args.exclude)
 exclude_folders = args.exclude
+exclude_subfolders = args.exclude_subfolders
 
 print("Filesystem\tMounted on\tUse%\tIUse%")
 mounted_filesystems = []
@@ -68,8 +75,7 @@ with contextlib.closing(open('/etc/mtab')) as fp:
                     block_usage_pct = 100.0 - (float(r.f_bavail) / float(r.f_blocks) * 100)
                     inode_usage_pct = 100.0 - (float(r.f_favail) / float(r.f_files) * 100)
                     if fs_file in exclude_folders:
-                        print('Exclude folder', fs_file)
-                        pass
+                        print('Exclude drive folder', fs_file)
                     else:
                         mounted_filesystems.append(fs_file)
                         print("%s\t%s\t\t%d%%\t%d%%" % (fs_spec, fs_file, block_usage_pct, inode_usage_pct))
@@ -112,6 +118,10 @@ duplicates = []
 
 def searchTree(path):
     global subtree_visit_num
+    if path in exclude_subfolders:
+        print('Path in subfolders to exclude:', path)
+        return 0, 0
+
     total_size = 0
     digest = 0
     subtree_visit_num += 1
@@ -130,20 +140,18 @@ def searchTree(path):
                     basename = os.path.basename(dir_entry.path)
                     digest += hash(basename)
                     if dir_entry.is_file():
-                        # print('File', dir_entry)
                         total_size += os.path.getsize(dir_entry.path)
                     else:
-                        # print('Dir ', dir_entry)
                         folder_digest, folder_size = searchTree(dir_entry.path)
                         digest += folder_digest
                         total_size += folder_size
 
         if total_size > args.minsize and digest != 0:
             with lock:
-                if digest in paths:
-                    # print('Look at', path, '\nand', paths[digest], 'size:', sizes[digest])
+                folder_key = digest + total_size
+                if folder_key in paths:
                     # If either path of a duplicate wholly contains either path of another duplicate, then it's a subtree
-                    new_dupe = Duplicate(total_size, path, paths[digest])
+                    new_dupe = Duplicate(total_size, path, paths[folder_key])
                     orphan = True
                     children = {}
                     for dupe in duplicates:
@@ -159,17 +167,14 @@ def searchTree(path):
                             if dupe.getKey() not in children:
                                 children[dupe.getKey()] = dupe
                     if orphan:
-                        # print('Add dupe', new_dupe)
                         duplicates.append(new_dupe)
                     for child in children.values():
-                        # print('Remove child', dupe)
                         duplicates.remove(child)
                 else:
                     drive_threads = []
                     for th in threads:
                         if th.is_alive():
                             drive_threads.append(th.name)
-                    # print('Threads ', len(ths))
                     paths[digest] = path
                     sizes[digest] = total_size
     except PermissionError:
@@ -191,9 +196,7 @@ if __name__ == "__main__":
     for index, thread in enumerate(threads):
         thread.join()
 
-    # print(len(paths), 'candidate paths added')
-
     sorted_duplicates = sorted(duplicates, key=operator.attrgetter('size'), reverse=True)
     for duplicate in sorted_duplicates:
         print(duplicate)
-    print('All done')
+    print('...done')

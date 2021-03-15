@@ -26,7 +26,7 @@ class Args:
         parser = argparse.ArgumentParser('Find duplicate folders in filesystem')
         # parser.add_argument('infile', metavar='input file', nargs=1, help='File to process')
         parser.add_argument('-e', '--exclude', default='/run/timeshift/backup,/', help='Comma separated list of root-level folders to exclude')
-        parser.add_argument('-m', '--minsize', default='10G', help='Smallest size to care about')
+        parser.add_argument('-m', '--minsize', default='5G', help='Smallest size to care about')
         parser.add_argument('-x', '--exclude-subfolders', default='/media/pdavies/Hitachi/timeshift', help='Folders to exclude from search')
 
         # parser.add_argument('infile', nargs='?', type=argparse.FileType('r'), default=sys.stdin)
@@ -117,6 +117,7 @@ duplicates = []
 
 
 def searchTree(path):
+    # What if here we treat files and folders uniformly?
     global subtree_visit_num
     if path in exclude_subfolders:
         print('Path in subfolders to exclude:', path)
@@ -140,7 +141,10 @@ def searchTree(path):
                     basename = os.path.basename(dir_entry.path)
                     digest += hash(basename)
                     if dir_entry.is_file():
-                        total_size += os.path.getsize(dir_entry.path)
+                        filesize = os.path.getsize(dir_entry.path)
+                        total_size += filesize
+                        # Also add in the file size as an extra indicator of similarity when comparing with cousins
+                        digest += filesize
                     else:
                         folder_digest, folder_size = searchTree(dir_entry.path)
                         digest += folder_digest
@@ -148,7 +152,7 @@ def searchTree(path):
 
         if total_size > args.minsize and digest != 0:
             with lock:
-                folder_key = digest + total_size
+                folder_key = digest
                 if folder_key in paths:
                     # If either path of a duplicate wholly contains either path of another duplicate, then it's a subtree
                     new_dupe = Duplicate(total_size, path, paths[folder_key])

@@ -32,7 +32,7 @@ class Args:
         # parser.add_argument('infile', metavar='input file', nargs=1, help='File to process')
         parser.add_argument('-e', '--exclude', default=None, help='Comma separated list of root-level folders to exclude')
         parser.add_argument('-m', '--minsize', default='5G', help='Smallest size to care about')
-        parser.add_argument('-x', '--exclude-subfolders', default='/media/pdavies/Hitachi/timeshift', help='Folders to exclude from search')
+        parser.add_argument('-x', '--exclude-subfolders', default='/media/pdavies/Hitachi/timeshift,/proc,/run', help='Folders to exclude from search')
 
         parser_args = parser.parse_args()
         # print(parser_args)
@@ -110,11 +110,16 @@ class Duplicate:
     def getKey(self):
         return self.__path1 + '+' + self.__path2
 
+    def anyendswith(self, other_dupe, string):
+        return self.__path1.endswith(string) or self.__path2.endswith(string) or other_dupe.__path1.endswith(string) or other_dupe.__path2.endswith(string)
+
     def isChildOf(self, other_dupe):
         # Either path1 or path2 of either dupe might be a different device, so a different root, but they must have a root in common
         # so if we compare all permutations we should catch it
         # Comparison is a,b with c,d so a child would mean 'a' is a child of 'c' and 'b' of 'd' OR
         # 'a' of 'd' and 'b' of 'c'
+        # if self.anyendswith(other_dupe, 'Win7Pro-disk3.vmdk'):
+        #     print('Yeah')
         we_are_child = isChild(self.__path1, other_dupe.__path1) and isChild(self.__path2, other_dupe.__path2)
         we_are_child = we_are_child or (isChild(self.__path1, other_dupe.__path2) and isChild(self.__path2, other_dupe.__path1))
         return we_are_child
@@ -127,24 +132,24 @@ def searchTree(path):
     # What if here we treat files and folders uniformly?
     global subtree_visit_num
     if path in exclude_subfolders:
-        print('Path in subfolders to exclude:', path)
+        print('Path is in subfolders to exclude:', path)
         return 0, 0
 
     if threadName() == '/':
         # print('root')
         if any(substring in path for substring in nonroot_filesystems):
-            print("Skip %s, it's on another drive" % path)
+            print("Skip %s whilst searcing '/', it's on another drive" % path)
             return 0, 0
 
     total_size = 0
     digest = 0
     subtree_visit_num += 1
     if subtree_visit_num % 100000 == 0:
-        if len(path) > 100:
-            vp = path[0:49] + '...' + path[-49:]
-        else:
-            vp = path
-        print('Visiting subtree #%d. Paths added: %d. Duplicates: %d. <%s>' % (subtree_visit_num, len(paths), len(duplicates), vp))
+        # if len(path) > 100:
+        #     vp = path[0:49] + '...' + path[-49:]
+        # else:
+        #     vp = path
+        print('Visiting subtree #%d. Paths added: %d. Duplicates: %d. %s' % (subtree_visit_num, len(paths), len(duplicates), threadName()))
 
     # At this level we're assuming this is a folder, and we've ensured we're only calling this for folders
     try:
@@ -169,7 +174,7 @@ def searchTree(path):
                     if filesize > args.minsize:
                         file_key = filedigest + filesize
                         filepath = dir_entry.path
-                        print('Effing great file', filepath, threadName())
+                        # print('Effing great file', filepath, threadName())
                         if file_key in paths:
                             # The key already has an entry, but the paths really really should be different!
                             if filepath == paths[file_key]:
@@ -198,18 +203,18 @@ def searchTree(path):
                     new_dupe = Duplicate(total_size, path, paths[folder_key])
                     orphan = True
                     children = {}
-                    for dupe in duplicates:
-                        if new_dupe.isChildOf(dupe):
+                    for already_registered_dupe in duplicates:
+                        if new_dupe.isChildOf(already_registered_dupe):
                             # We have a parent, so our existence is pointless
                             # assert not children, 'We have a child and a parent. How did the child survive here without the parent already deleting it?'
                             # print('We have a parent')
                             orphan = False
-                        if dupe.isChildOf(new_dupe):
+                        if already_registered_dupe.isChildOf(new_dupe):
                             # We're the parent of an existing duplicate, so that child is now useless and should be removed
                             # assert orphan, 'We have a parent and a child. How did the child survive here without the parent already deleting it?'
                             # print('We have a child')
-                            if dupe.getKey() not in children:
-                                children[dupe.getKey()] = dupe
+                            if already_registered_dupe.getKey() not in children:
+                                children[already_registered_dupe.getKey()] = already_registered_dupe
                     if orphan:
                         duplicates.append(new_dupe)
                     for child in children.values():
@@ -239,7 +244,7 @@ def timedSearchTree(mounted_fs):
     start = time.time()
     searchTree(mounted_fs)
     end = time.time()
-    drive_timings.append('Searching drive %s took %d seconds' % (mounted_fs, end - start))
+    drive_timings.append('Scanning drive %s took %d seconds' % (mounted_fs, end - start))
 
 
 if __name__ == "__main__":
@@ -252,9 +257,10 @@ if __name__ == "__main__":
         thread.join()
 
     sorted_duplicates = sorted(duplicates, key=operator.attrgetter('size'), reverse=True)
+    print('Candidate duplicates:')
     for duplicate in sorted_duplicates:
         print(duplicate)
-
+    print('----')
     for drive_timing in drive_timings:
         print(drive_timing)
     print('...done')
